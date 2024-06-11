@@ -1,44 +1,27 @@
-# Utilizar uma imagem base do OpenJDK para rodar a aplicação
+# Use uma imagem base do Maven para construir o aplicativo
+FROM maven:3.8.5-openjdk-17 AS build
 
-FROM openjdk:17-jdk-alpine as build
- 
-# Definir o diretório de trabalho no container
+# Defina o diretório de trabalho
+WORKDIR /app
 
-WORKDIR /workspace/app
- 
-# Copiar o arquivo pom.xml e os arquivos de código fonte
-
-COPY mvnw .
-
-COPY .mvn .mvn
-
+# Copie o arquivo pom.xml e baixe as dependências
 COPY pom.xml .
+RUN mvn dependency:go-offline -B
 
-COPY src src
- 
-# Dar permissão de execução ao Maven Wrapper
+# Copie o código fonte
+COPY src ./src
 
-RUN chmod +x ./mvnw
- 
-# Construir o aplicativo com Maven Wrapper
+# Compile e empacote a aplicação
+RUN mvn clean package -DskipTests
 
-RUN ./mvnw clean install
-
- 
-# Segunda etapa da construção, para obter uma imagem mais limpa e leve
-
+# Use uma imagem base do Java para rodar o aplicativo
 FROM openjdk:17-jdk-alpine
 
-VOLUME /tmp
- 
-# Copiar o arquivo JAR do estágio de construção para o estágio de execução
+# Copie o jar da fase de construção para o contêiner final
+COPY --from=build /app/target/*.jar app.jar
 
-COPY --from=build /workspace/app/target/back-end_SB_AOS-0.0.1-SNAPSHOT.jar app.jar
- 
-# Indicar que o container irá escutar na porta 8080
-
+# Expor a porta que a aplicação usará
 EXPOSE 8080
- 
-# Comando para executar a aplicação
 
+# Comando para executar a aplicação
 ENTRYPOINT ["java","-jar","/app.jar"]
